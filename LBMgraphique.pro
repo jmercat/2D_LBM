@@ -15,6 +15,12 @@ TEMPLATE = app
 SOURCES += main.cpp\
         grid.cpp
 
-HEADERS  += grid.h
+HEADERS  += grid.h \
+    lbm.hpp \
+    Debug.hpp
 
 FORMS    += grid.ui
+
+CONFIG += c++11
+
+LIBS += -lboost_system
