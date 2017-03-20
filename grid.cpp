@@ -26,6 +26,15 @@ Grid::Grid(int m, int n, QWidget *parent) :
     setGridRect();
     this->setMouseTracking(true);
     ui->setupUi(this);
+//    for(int i = 0; i<mWidth; i++)
+//    {
+//        for (int j= 0; j<mHeight; j++)
+//        {
+//            (*mGrid)(i+1,j+1) = 1;
+//        }
+//    }
+    std::fill(mGrid->data().begin(),mGrid->data().end(),1);
+    this->update();
 }
 
 Grid::~Grid()
@@ -41,6 +50,13 @@ std::shared_ptr<boost::numeric::ublas::matrix<int> > Grid::getObstacles()
 void Grid::clearGrid()
 {
     mGrid->clear();
+    for(int i = 0; i<mWidth; i++)
+    {
+        for (int j= 0; j<mHeight; j++)
+        {
+            (*mGrid)(i+1,j+1) = 1;
+        }
+    }
     this->update();
 }
 
@@ -155,7 +171,7 @@ void Grid::mousePressEvent(QMouseEvent *event)
         if (event->key()==Qt::Key_Enter || event->key()==Qt::Key_Return)
         {   
             std::cout << "Enter key event" << std::endl;
-            emit compute(1000);
+            emit compute(10000);
 
         }else if(event->key()==Qt::Key_0)
         {
