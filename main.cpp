@@ -6,7 +6,7 @@
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-    constexpr unsigned int x = 70, y = 70;
+    constexpr unsigned int x = 200, y = 200;
     Grid w(x,y);
 //    std::shared_ptr<boost::numeric::ublas::matrix<int> > grid();
     LBM<x,y> lbm(w.getObstacles());

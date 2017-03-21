@@ -6,6 +6,8 @@
 
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/io.hpp>
+#include <eigen3/Eigen/Dense>
+
 
 namespace Ui
 {

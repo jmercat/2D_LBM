@@ -5,6 +5,8 @@
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/matrix.hpp>
 #include "boost/multi_array.hpp"
+#define EIGEN_STACK_ALLOCATION_LIMIT 0
+
 #include <eigen3/Eigen/Dense>
 #include <array>
 #include <fstream>
@@ -14,7 +16,6 @@
 
 #define NAVIERSTOKES
 //#define STOKES
-
 
 
 class catchGridSignal: public QObject
@@ -47,8 +48,6 @@ private:
     Eigen::Matrix<float,iMax,jMax> mUx;
     Eigen::Matrix<float,iMax,jMax> mUy;
 
-
-    std::unique_ptr<boost::numeric::ublas::matrix<float> > mCl;
 
     static constexpr float sNu=0.01, sUin=0.4;
     static constexpr int sQMax = 9;
@@ -299,14 +298,14 @@ void LBM<iMax, jMax>::Iterate(int nIter)
                 }else  //obst(i,j) == 0
                 {
                     mGnp0(i+1,j+1) = mGn0(i+1,j+1);
-                    mGnp1(i+2,j+1) = mGn1(i+1,j+1);
-                    mGnp2(i+1,j+2) = mGn2(i+1,j+1);
-                    mGnp3(i,j+1)   = mGn3(i+1,j+1);
-                    mGnp4(i+1,j)   = mGn4(i+1,j+1);
-                    mGnp5(i+2,j+2) = mGn5(i+1,j+1);
-                    mGnp6(i,j+2)   = mGn6(i+1,j+1);
-                    mGnp7(i,j)     = mGn7(i+1,j+1);
-                    mGnp8(i+2,j)   = mGn8(i+1,j+1);
+                    mGnp1(i+2,j+1) = mGn3(i+1,j+1);
+                    mGnp2(i+1,j+2) = mGn4(i+1,j+1);
+                    mGnp3(i,j+1)   = mGn1(i+1,j+1);
+                    mGnp4(i+1,j)   = mGn2(i+1,j+1);
+                    mGnp5(i+2,j+2) = mGn7(i+1,j+1);
+                    mGnp6(i,j+2)   = mGn8(i+1,j+1);
+                    mGnp7(i,j)     = mGn5(i+1,j+1);
+                    mGnp8(i+2,j)   = mGn6(i+1,j+1);
                 }
 
 
