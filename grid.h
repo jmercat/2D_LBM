@@ -32,7 +32,7 @@ public slots:
 signals:
     void compute(unsigned int nIter);
 protected:
-    static int windowWidth, windowHeight;
+    const int windowWidth, windowHeight;
     int mWidth, mHeight;
     Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic> mGrid;
     Eigen::Matrix<Eigen::Matrix<unsigned char,3,1>,Eigen::Dynamic,Eigen::Dynamic> mColorGrid;

@@ -7,15 +7,14 @@
 
 #include <iostream>
 
-int Grid::windowWidth = 600;
-int Grid::windowHeight = 600;
-
 Grid::Grid(int m, int n, QWidget *parent) :
     QWidget(parent),
-    ui(new Ui::Grid)
+    ui(new Ui::Grid),
+    windowWidth(n*600/m),
+    windowHeight(600)
 {
-    mWidth = m;
-    mHeight = n;
+    mWidth = n;
+    mHeight = m;
     mGrid.resize(n+2,m+2);
     mColorGrid.resize(n+2,m+2);
     mGridRect.resize(n,m);
@@ -94,7 +93,8 @@ void Grid::setGridRect()
         for (int j= 0; j<mHeight; j++)
         {
             mGrid(i+1,j+1) = 0;
-            mGridRect(i,j).setCoords(i*rectWidth+1,j*rectHeight+1,(i+1)*rectWidth-1,(j+1)*rectHeight-1);
+            mGridRect(i,j).setCoords(i*rectWidth,j*rectHeight,(i+1)*rectWidth,(j+1)*rectHeight);
+//            mGridRect(i,j).setCoords(i*rectWidth+1,j*rectHeight+1,(i+1)*rectWidth-1,(j+1)*rectHeight-1); // show grid
         }
     }
     this->update();
@@ -113,7 +113,7 @@ void Grid::drawGrid(QPainter* painter)
         for (int j= 0; j<mHeight; j++)
         {
             painter->setPen(linePen);
-            painter->drawRect(mGridRect(i,j));
+//            painter->drawRect(mGridRect(i,j));
             if (mGrid(i+1,j+1)==1)
             {
                 QColor color(mColorGrid(i,j)(0),mColorGrid(i,j)(1),mColorGrid(i,j)(2));
@@ -137,7 +137,6 @@ void Grid::draw(int i, int j, int color)
 void Grid::paintEvent(QPaintEvent *e)
 {
     QPainter painter(this);
-    std::cout << "paint event" << std::endl;
     drawGrid(&painter);
 }
 
@@ -202,7 +201,6 @@ void Grid::mousePressEvent(QMouseEvent *event)
     {
         if (event->key()==Qt::Key_Enter || event->key()==Qt::Key_Return)
         {   
-            std::cout << "Enter key event" << std::endl;
             emit compute(10000);
 
         }else if(event->key()==Qt::Key_0)

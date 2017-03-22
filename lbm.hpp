@@ -30,7 +30,7 @@ signals:
 
 };
 
-template <const unsigned int iMax, const  unsigned int jMax>
+template <const unsigned int jMax, const  unsigned int iMax>
 class LBM: public catchGridSignal
 {
 public:
@@ -135,17 +135,17 @@ private:
 };
 
 
-template<const unsigned int iMax,const unsigned int jMax>
-LBM<iMax,jMax>::LBM(Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic>& grid, Eigen::Matrix<Eigen::Matrix<unsigned char, 3, 1>, Eigen::Dynamic, Eigen::Dynamic> &color):
+template <const unsigned int jMax, const  unsigned int iMax>
+LBM<jMax,iMax>::LBM(Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic>& grid, Eigen::Matrix<Eigen::Matrix<unsigned char, 3, 1>, Eigen::Dynamic, Eigen::Dynamic> &color):
     mObstacle(grid),
     mColorGrid(color)
 {
-    assert(grid.cols() == iMax+2 && grid.rows() == jMax+2);
+    assert(grid.cols() == jMax+2 && grid.rows() == iMax+2);
     mRescaler = 1;
 }
 
-template<const unsigned int iMax,const unsigned int jMax>
-void LBM<iMax, jMax>::updateColor()
+template<const unsigned int jMax,const unsigned int iMax>
+void LBM<jMax, iMax>::updateColor()
 {
     float normMax;
     for (unsigned int j = 0; j<jMax; j++)
@@ -177,8 +177,8 @@ void LBM<iMax, jMax>::updateColor()
     emit colorUpdated();
 }
 
-template<const unsigned int iMax, const unsigned int jMax>
-void LBM<iMax, jMax>::saveVtk(std::string fileName)
+template<const unsigned int jMax, const unsigned int iMax>
+void LBM<jMax, iMax>::saveVtk(std::string fileName)
 {
     std::ofstream vtkFile;
     std::cout << "save " << fileName << std::endl;
@@ -226,8 +226,8 @@ void LBM<iMax, jMax>::saveVtk(std::string fileName)
 }
 
 
-template<const unsigned int iMax, const unsigned int jMax>
-void LBM<iMax, jMax>::Iterate(int nIter)
+template<const unsigned int jMax, const unsigned int iMax>
+void LBM<jMax, iMax>::Iterate(int nIter)
 {
 
     mUy.setZero();
@@ -406,7 +406,7 @@ void LBM<iMax, jMax>::Iterate(int nIter)
         mGn8.swap(mGnp8);
 
         //~ //--- sorties fichiers
-        if(iter%50 == 0)
+        if(iter%30 == 0)
         {
             std::cout << "iteration " << iter << std::endl;
 //            buf.str("");
