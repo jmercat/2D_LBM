@@ -5,7 +5,8 @@
 #include <QtGui>
 #include <QtCore>
 
-using namespace boost::numeric::ublas;
+#include <iostream>
+
 int Grid::windowWidth = 600;
 int Grid::windowHeight = 600;
 
@@ -15,9 +16,10 @@ Grid::Grid(int m, int n, QWidget *parent) :
 {
     mWidth = m;
     mHeight = n;
-    mGrid = std::shared_ptr<matrix<int> >(new matrix<int>(n+2,m+2));
-    mGridRect = std::unique_ptr<matrix<QRect> >(new matrix<QRect>(n,m));
-    this->setFixedSize(600,600);
+    mGrid.resize(n+2,m+2);
+    mColorGrid.resize(n+2,m+2);
+    mGridRect.resize(n,m);
+    this->setFixedSize(windowWidth,windowHeight);
     mCursorI = 0;
     mCursorJ = 0;
     mIsLeftClick = false;
@@ -30,10 +32,19 @@ Grid::Grid(int m, int n, QWidget *parent) :
 //    {
 //        for (int j= 0; j<mHeight; j++)
 //        {
-//            (*mGrid)(i+1,j+1) = 1;
+//            mGrid(i+1,j+1) = 1;
 //        }
 //    }
-    std::fill(mGrid->data().begin(),mGrid->data().end(),1);
+    mGrid.setOnes();
+    for(int i = 0; i<mWidth+2; i++)
+    {
+        for (int j= 0; j<mHeight+2; j++)
+        {
+            mColorGrid(i,j)(0)=0;
+            mColorGrid(i,j)(1)=0;
+            mColorGrid(i,j)(2)=0;
+        }
+    }
     this->update();
 }
 
@@ -42,22 +53,34 @@ Grid::~Grid()
     delete ui;
 }
 
-std::shared_ptr<boost::numeric::ublas::matrix<int> > Grid::getObstacles()
+Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> &Grid::getObstacles()
 {
     return mGrid;
 }
 
+Eigen::Matrix<Eigen::Matrix<unsigned char,3,1>, Eigen::Dynamic, Eigen::Dynamic> &Grid::getColor()
+{
+    return mColorGrid;
+}
+
 void Grid::clearGrid()
 {
-    mGrid->clear();
+    mGrid.setOnes();
+    mColorGrid.setOnes();
     for(int i = 0; i<mWidth; i++)
     {
         for (int j= 0; j<mHeight; j++)
         {
-            (*mGrid)(i+1,j+1) = 1;
+            mGrid(i+1,j+1) = 1;
         }
     }
     this->update();
+}
+
+void Grid::updateColor()
+{
+    std::cout << "Update color" << std::endl;
+    this->repaint();
 }
 
 void Grid::setGridRect()
@@ -65,13 +88,13 @@ void Grid::setGridRect()
     int rectWidth = windowWidth/mWidth;
     int rectHeight = windowHeight/mHeight;
 
-    mGrid->clear();
+    mGrid.setZero();
     for(int i = 0; i<mWidth; i++)
     {
         for (int j= 0; j<mHeight; j++)
         {
-            (*mGrid)(i+1,j+1) = 0;
-            (*mGridRect)(i,j).setCoords(i*rectWidth+1,j*rectHeight+1,(i+1)*rectWidth-1,(j+1)*rectHeight-1);
+            mGrid(i+1,j+1) = 0;
+            mGridRect(i,j).setCoords(i*rectWidth+1,j*rectHeight+1,(i+1)*rectWidth-1,(j+1)*rectHeight-1);
         }
     }
     this->update();
@@ -90,26 +113,31 @@ void Grid::drawGrid(QPainter* painter)
         for (int j= 0; j<mHeight; j++)
         {
             painter->setPen(linePen);
-            painter->drawRect((*mGridRect)(i,j));
-            if ((*mGrid)(i+1,j+1)==1) // divide by 2
+            painter->drawRect(mGridRect(i,j));
+            if (mGrid(i+1,j+1)==1)
             {
-                painter->fillRect((*mGridRect)(i,j),brushBlack);
+                QColor color(mColorGrid(i,j)(0),mColorGrid(i,j)(1),mColorGrid(i,j)(2));
+                QBrush brushColor(color,Qt::SolidPattern);
+                painter->fillRect(mGridRect(i,j),brushColor);
             }
             else
-                painter->fillRect((*mGridRect)(i,j),brushWhite);
+            {
+                painter->fillRect(mGridRect(i,j),brushWhite);
+            }
         }
     }
-    painter->fillRect((*mGridRect)(mCursorI,mCursorJ),brushGray);
+    painter->fillRect(mGridRect(mCursorI,mCursorJ),brushGray);
 }
 
 void Grid::draw(int i, int j, int color)
 {
-    (*mGrid)(i+1,j+1)=color;
+    mGrid(i+1,j+1)=color;
 }
 
 void Grid::paintEvent(QPaintEvent *e)
 {
     QPainter painter(this);
+    std::cout << "paint event" << std::endl;
     drawGrid(&painter);
 }
 
@@ -128,14 +156,18 @@ void Grid::mouseMoveEvent(QMouseEvent *mouseEvent)
 //          drawCursor(mGrid,i,j,1);
 
           if (mIsLeftClick)
-              this->draw(i,j,1);
-          else if (mIsRightClick)
+          {
               this->draw(i,j,0);
-
+          }
+          else if (mIsRightClick)
+          {
+              this->draw(i,j,1);
+          }
+          this->update(mGridRect(mCursorI,mCursorJ));
+          this->update(mGridRect(i,j));
           mCursorI = i;
           mCursorJ = j;
       }
-      this->update();
 }
 
 void Grid::mousePressEvent(QMouseEvent *event)
@@ -149,11 +181,11 @@ void Grid::mousePressEvent(QMouseEvent *event)
     j = qMin(qMax(event->pos().y()/rectHeight,0),mHeight-1);
     if (event->button()==Qt::LeftButton)
     {
-        draw(i,j,1);
+        draw(i,j,0);
         mIsLeftClick = 1;
     }else if (event->button()==Qt::RightButton)
     {
-        draw(i,j,0);
+        draw(i,j,1);
         mIsRightClick = 1;
     }
 }
@@ -175,7 +207,7 @@ void Grid::mousePressEvent(QMouseEvent *event)
 
         }else if(event->key()==Qt::Key_0)
         {
-            mGrid->clear();
+            mGrid.setZero();
             this->update();
         }
     }

@@ -2,10 +2,11 @@
 #define LBM_HPP
 
 #include "grid.h"
-#include <boost/numeric/ublas/vector.hpp>
-#include <boost/numeric/ublas/matrix.hpp>
-#include "boost/multi_array.hpp"
-#define EIGEN_STACK_ALLOCATION_LIMIT 0
+
+#ifndef EIGEN_STACK_ALLOCATION_LIMIT
+// default 131072 == 128 KB, 2097152 = 2MB
+#define EIGEN_STACK_ALLOCATION_LIMIT 2097152
+#endif
 
 #include <eigen3/Eigen/Dense>
 #include <array>
@@ -25,6 +26,7 @@ public slots:
     virtual void compute(unsigned int nIter) = 0;
 signals:
     void endCompute();
+    void colorUpdated();
 
 };
 
@@ -32,22 +34,23 @@ template <const unsigned int iMax, const  unsigned int jMax>
 class LBM: public catchGridSignal
 {
 public:
-    LBM(std::shared_ptr<boost::numeric::ublas::matrix<int> > grid);
+    LBM(Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic>& grid,Eigen::Matrix<Eigen::Matrix<unsigned char,3,1>,Eigen::Dynamic,Eigen::Dynamic>& color);
     void compute(unsigned int nIter){Iterate(nIter);}
-//public slots:
-//    void compute(std::shared_ptr<boost::numeric::ublas::matrix<int> > grid);
 protected:
     void saveVtk(std::string fileName);
     void Iterate(int nIter);
 
 private:
 
-    std::shared_ptr<boost::numeric::ublas::matrix<int> > mObstacle;
+    float mRescaler;
+    void updateColor();
+
+    Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic>& mObstacle;
+    Eigen::Matrix<Eigen::Matrix<unsigned char,3,1>,Eigen::Dynamic,Eigen::Dynamic>& mColorGrid;
 
     Eigen::Matrix<float,iMax,jMax> mRho;
     Eigen::Matrix<float,iMax,jMax> mUx;
     Eigen::Matrix<float,iMax,jMax> mUy;
-
 
     static constexpr float sNu=0.01, sUin=0.4;
     static constexpr int sQMax = 9;
@@ -131,11 +134,47 @@ private:
     }
 };
 
+
 template<const unsigned int iMax,const unsigned int jMax>
-LBM<iMax,jMax>::LBM(std::shared_ptr<boost::numeric::ublas::matrix<int> > grid):
-    mObstacle(grid)
+LBM<iMax,jMax>::LBM(Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic>& grid, Eigen::Matrix<Eigen::Matrix<unsigned char, 3, 1>, Eigen::Dynamic, Eigen::Dynamic> &color):
+    mObstacle(grid),
+    mColorGrid(color)
 {
-    assert(grid->size1() == iMax+2 && grid->size2() == jMax+2);
+    assert(grid.cols() == iMax+2 && grid.rows() == jMax+2);
+    mRescaler = 1;
+}
+
+template<const unsigned int iMax,const unsigned int jMax>
+void LBM<iMax, jMax>::updateColor()
+{
+    float normMax;
+    for (unsigned int j = 0; j<jMax; j++)
+    {
+        for (unsigned int i = 0; i<iMax; i++)
+        {
+            float norm = sqrt((mUx(i,j)*mUx(i,j)+ mUy(i,j)*mUy(i,j)));
+            normMax = std::max(normMax,norm);
+            if (mRescaler*norm<0.5)
+            {
+                mColorGrid(i,j)(0) = 255*mRescaler*norm*2;
+                mColorGrid(i,j)(1) = 255*norm*mRescaler*2;
+                mColorGrid(i,j)(2) = 255;
+            }else if(mRescaler*norm<1)
+            {
+                mColorGrid(i,j)(0) = 255;
+                mColorGrid(i,j)(1) = 255*(1-(norm*mRescaler-0.5)*2);
+                mColorGrid(i,j)(2) = 255*(1-(norm*mRescaler-0.5)*2);
+            }else
+            {
+                mColorGrid(i,j)(0) = 200;
+                mColorGrid(i,j)(1) = 0;
+                mColorGrid(i,j)(2) = 0;
+            }
+
+        }
+    }
+    mRescaler = 0.1/normMax+0.9*mRescaler;
+    emit colorUpdated();
 }
 
 template<const unsigned int iMax, const unsigned int jMax>
@@ -198,7 +237,7 @@ void LBM<iMax, jMax>::Iterate(int nIter)
         for (unsigned j = 1; j<jMax+1; j++)
         {
             mRho(i-1,j-1)=1;
-            if ((*mObstacle)(i,j)==0)
+            if (mObstacle(i,j)==0)
             {
                 mUx(i-1,j-1) = 0;
             }else
@@ -255,7 +294,7 @@ void LBM<iMax, jMax>::Iterate(int nIter)
 
                 //-- pour que la visualisation soit plus claire, on met mUx et uy a 0 dans le solide
 
-                if ((*mObstacle)(i,j) == 1)
+                if (mObstacle(i,j) == 1)
                 {
                     mUx(i,j) = 1./mRho(i,j)*sC*(mGn1(i+1,j+1)- mGn3(i+1,j+1) + mGn5(i+1,j+1) - mGn6(i+1,j+1) - mGn7(i+1,j+1) + mGn8(i+1,j+1));
                     mUy(i,j) = 1./mRho(i,j)*sC*(mGn2(i+1,j+1)- mGn4(i+1,j+1) + mGn5(i+1,j+1) + mGn6(i+1,j+1) - mGn7(i+1,j+1) - mGn8(i+1,j+1));
@@ -370,9 +409,10 @@ void LBM<iMax, jMax>::Iterate(int nIter)
         if(iter%50 == 0)
         {
             std::cout << "iteration " << iter << std::endl;
-            buf.str("");
-            buf << "u_" << iter <<".vtk";
-            saveVtk(buf.str());
+//            buf.str("");
+//            buf << "u_" << iter <<".vtk";
+//            saveVtk(buf.str());
+            updateColor();
         }
 
     }// fin boucle en temps

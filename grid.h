@@ -4,8 +4,11 @@
 #include <QWidget>
 #include <memory>
 
-#include <boost/numeric/ublas/matrix.hpp>
-#include <boost/numeric/ublas/io.hpp>
+#ifndef EIGEN_STACK_ALLOCATION_LIMIT
+// default 131072 == 128 KB, 2097152 = 2MB
+#define EIGEN_STACK_ALLOCATION_LIMIT 2097152
+#endif
+
 #include <eigen3/Eigen/Dense>
 
 
@@ -21,16 +24,19 @@ class Grid : public QWidget
 public:
     explicit Grid(int m, int n, QWidget *parent = 0);
     ~Grid();
-    std::shared_ptr<boost::numeric::ublas::matrix<int> > getObstacles();
+    Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic>& getObstacles();
+    Eigen::Matrix<Eigen::Matrix<unsigned char,3,1>,Eigen::Dynamic,Eigen::Dynamic>& getColor();
 public slots:
     void clearGrid();
+    void updateColor();
 signals:
     void compute(unsigned int nIter);
 protected:
     static int windowWidth, windowHeight;
     int mWidth, mHeight;
-    std::shared_ptr<boost::numeric::ublas::matrix<int> > mGrid;
-    std::unique_ptr<boost::numeric::ublas::matrix<QRect> > mGridRect;
+    Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic> mGrid;
+    Eigen::Matrix<Eigen::Matrix<unsigned char,3,1>,Eigen::Dynamic,Eigen::Dynamic> mColorGrid;
+    Eigen::Matrix<QRect,Eigen::Dynamic,Eigen::Dynamic> mGridRect;
 
     int mCursorI, mCursorJ;
     bool mIsLeftClick;
