@@ -23,5 +23,3 @@ FORMS    += grid.ui
 
 CONFIG += c++11
 QMAKE_CXXFLAGS_RELEASE += -O3
-
-LIBS += -lboost_system

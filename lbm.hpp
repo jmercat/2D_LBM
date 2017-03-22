@@ -36,13 +36,15 @@ class LBM: public catchGridSignal
 public:
     LBM(Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic>& grid,Eigen::Matrix<Eigen::Matrix<unsigned char,3,1>,Eigen::Dynamic,Eigen::Dynamic>& color);
     void compute(unsigned int nIter){Iterate(nIter);}
+
 protected:
     void saveVtk(std::string fileName);
     void Iterate(int nIter);
+    void Init();
 
 private:
 
-    float mRescaler;
+    Eigen::Matrix<float,2,1> mRescaler;
     void updateColor();
 
     Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic>& mObstacle;
@@ -141,29 +143,35 @@ LBM<jMax,iMax>::LBM(Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic>& grid, Eige
     mColorGrid(color)
 {
     assert(grid.cols() == jMax+2 && grid.rows() == iMax+2);
-    mRescaler = 1;
+    mRescaler(0)=1;
+    mRescaler(1)=0;
+    this->Init();
 }
 
 template<const unsigned int jMax,const unsigned int iMax>
 void LBM<jMax, iMax>::updateColor()
 {
-    float normMax;
+    float normMax = 0;
+    float normMin = 1;
     for (unsigned int j = 0; j<jMax; j++)
     {
         for (unsigned int i = 0; i<iMax; i++)
         {
             float norm = sqrt((mUx(i,j)*mUx(i,j)+ mUy(i,j)*mUy(i,j)));
+//            float norm = mRho(i,j);
             normMax = std::max(normMax,norm);
-            if (mRescaler*norm<0.5)
+            normMin = std::min(normMin,norm);
+            norm -= mRescaler(1);
+            if (mRescaler(0)*norm<0.5)
             {
-                mColorGrid(i,j)(0) = 255*mRescaler*norm*2;
-                mColorGrid(i,j)(1) = 255*norm*mRescaler*2;
+                mColorGrid(i,j)(0) = 255*mRescaler(0)*norm*2;
+                mColorGrid(i,j)(1) = 255*norm*mRescaler(0)*2;
                 mColorGrid(i,j)(2) = 255;
-            }else if(mRescaler*norm<1)
+            }else if(mRescaler(0)*norm<1)
             {
                 mColorGrid(i,j)(0) = 255;
-                mColorGrid(i,j)(1) = 255*(1-(norm*mRescaler-0.5)*2);
-                mColorGrid(i,j)(2) = 255*(1-(norm*mRescaler-0.5)*2);
+                mColorGrid(i,j)(1) = 255*(1-(norm*mRescaler(0)-0.5)*2);
+                mColorGrid(i,j)(2) = 255*(1-(norm*mRescaler(0)-0.5)*2);
             }else
             {
                 mColorGrid(i,j)(0) = 200;
@@ -173,7 +181,8 @@ void LBM<jMax, iMax>::updateColor()
 
         }
     }
-    mRescaler = 0.1/normMax+0.9*mRescaler;
+    mRescaler(1) = 0.2*normMin+0.8*mRescaler(1);
+    mRescaler(0) = 0.2/(normMax-normMin)+0.8*mRescaler(0);
     emit colorUpdated();
 }
 
@@ -227,50 +236,50 @@ void LBM<jMax, iMax>::saveVtk(std::string fileName)
 
 
 template<const unsigned int jMax, const unsigned int iMax>
+void LBM<jMax, iMax>::Init()
+{
+  mUy.setZero();
+
+  for(unsigned i  = 1; i<iMax+1; i++)
+  {
+      for (unsigned j = 1; j<jMax+1; j++)
+      {
+          mRho(i-1,j-1)=1;
+          if (mObstacle(i,j)==0)
+          {
+              mUx(i-1,j-1) = 0;
+          }else
+          {
+              mUx(i-1,j-1) = (1. - Yc(j-1)* Yc(j-1))*sUin;
+          }
+
+          mGn0(i,j) = omega(0)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(0,0)+mUy(i-1,j-1)*speeds(0,1));
+          mGnp0(i,j) = mGn0(i,j);
+          mGn1(i,j) = omega(1)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(1,0)+mUy(i-1,j-1)*speeds(1,1));
+          mGnp1(i,j) = mGn1(i,j);
+          mGn2(i,j) = omega(2)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(2,0)+mUy(i-1,j-1)*speeds(2,1));
+          mGnp2(i,j) = mGn2(i,j);
+          mGn3(i,j) = omega(3)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(3,0)+mUy(i-1,j-1)*speeds(3,1));
+          mGnp3(i,j) = mGn3(i,j);
+          mGn4(i,j) = omega(4)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(4,0)+mUy(i-1,j-1)*speeds(4,1));
+          mGnp4(i,j) = mGn4(i,j);
+          mGn5(i,j) = omega(5)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(5,0)+mUy(i-1,j-1)*speeds(5,1));
+          mGnp5(i,j) = mGn5(i,j);
+          mGn6(i,j) = omega(6)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(6,0)+mUy(i-1,j-1)*speeds(6,1));
+          mGnp6(i,j) = mGn6(i,j);
+          mGn7(i,j) = omega(7)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(7,0)+mUy(i-1,j-1)*speeds(7,1));
+          mGnp7(i,j) = mGn7(i,j);
+          mGn8(i,j) = omega(8)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(8,0)+mUy(i-1,j-1)*speeds(8,1));
+          mGnp8(i,j) = mGn8(i,j);
+      }
+  }
+}
+
+template<const unsigned int jMax, const unsigned int iMax>
 void LBM<jMax, iMax>::Iterate(int nIter)
 {
 
-    mUy.setZero();
-
-    for(unsigned i  = 1; i<iMax+1; i++)
-    {
-        for (unsigned j = 1; j<jMax+1; j++)
-        {
-            mRho(i-1,j-1)=1;
-            if (mObstacle(i,j)==0)
-            {
-                mUx(i-1,j-1) = 0;
-            }else
-            {
-                mUx(i-1,j-1) = (1. - Yc(j-1)* Yc(j-1))*sUin;
-            }
-
-            mGn0(i,j) = omega(0)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(0,0)+mUy(i-1,j-1)*speeds(0,1));
-            mGnp0(i,j) = mGn0(i,j);
-            mGn1(i,j) = omega(1)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(1,0)+mUy(i-1,j-1)*speeds(1,1));
-            mGnp1(i,j) = mGn1(i,j);
-            mGn2(i,j) = omega(2)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(2,0)+mUy(i-1,j-1)*speeds(2,1));
-            mGnp2(i,j) = mGn2(i,j);
-            mGn3(i,j) = omega(3)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(3,0)+mUy(i-1,j-1)*speeds(3,1));
-            mGnp3(i,j) = mGn3(i,j);
-            mGn4(i,j) = omega(4)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(4,0)+mUy(i-1,j-1)*speeds(4,1));
-            mGnp4(i,j) = mGn4(i,j);
-            mGn5(i,j) = omega(5)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(5,0)+mUy(i-1,j-1)*speeds(5,1));
-            mGnp5(i,j) = mGn5(i,j);
-            mGn6(i,j) = omega(6)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(6,0)+mUy(i-1,j-1)*speeds(6,1));
-            mGnp6(i,j) = mGn6(i,j);
-            mGn7(i,j) = omega(7)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(7,0)+mUy(i-1,j-1)*speeds(7,1));
-            mGnp7(i,j) = mGn7(i,j);
-            mGn8(i,j) = omega(8)*mRho(i-1,j-1)*(1+mUx(i-1,j-1)*speeds(8,0)+mUy(i-1,j-1)*speeds(8,1));
-            mGnp8(i,j) = mGn8(i,j);
-        }
-    }
-
     std::stringstream buf;
-    std::cout << "iteration " << 0 << std::endl;
-    buf.str("");
-    buf << "u_" << 0 <<".vtk";
-    saveVtk(buf.str());
 
     for (int iter = 1; iter<nIter; iter++)
     {
@@ -408,10 +417,10 @@ void LBM<jMax, iMax>::Iterate(int nIter)
         //~ //--- sorties fichiers
         if(iter%30 == 0)
         {
-            std::cout << "iteration " << iter << std::endl;
 //            buf.str("");
 //            buf << "u_" << iter <<".vtk";
 //            saveVtk(buf.str());
+            std::cout << "Rescale x" << mRescaler(0) << " -" << mRescaler(1) << std::endl;
             updateColor();
         }
 

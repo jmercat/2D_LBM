@@ -1,7 +1,5 @@
 #include "lbm.hpp"
 #include <QApplication>
-#include <boost/numeric/ublas/matrix.hpp>
-#include <boost/numeric/ublas/io.hpp>
 
 int main(int argc, char *argv[])
 {

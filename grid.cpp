@@ -78,7 +78,6 @@ void Grid::clearGrid()
 
 void Grid::updateColor()
 {
-    std::cout << "Update color" << std::endl;
     this->repaint();
 }
 
@@ -201,11 +200,11 @@ void Grid::mousePressEvent(QMouseEvent *event)
     {
         if (event->key()==Qt::Key_Enter || event->key()==Qt::Key_Return)
         {   
-            emit compute(10000);
+            emit compute(31);
 
         }else if(event->key()==Qt::Key_0)
         {
-            mGrid.setZero();
+            mGrid.setOnes();
             this->update();
         }
     }
