@@ -24,8 +24,8 @@ class Grid : public QWidget
 public:
     explicit Grid(int m, int n, QWidget *parent = 0);
     ~Grid();
-    Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic>& getObstacles();
-    Eigen::Matrix<Eigen::Matrix<unsigned char,3,1>,Eigen::Dynamic,Eigen::Dynamic>& getColor();
+    Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& getObstacles();
+    Eigen::Array<Eigen::Array<unsigned char,3,1>,Eigen::Dynamic,Eigen::Dynamic>& getColor();
 public slots:
     void clearGrid();
     void updateColor();
@@ -34,9 +34,9 @@ signals:
 protected:
     const int windowWidth, windowHeight;
     int mWidth, mHeight;
-    Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic> mGrid;
-    Eigen::Matrix<Eigen::Matrix<unsigned char,3,1>,Eigen::Dynamic,Eigen::Dynamic> mColorGrid;
-    Eigen::Matrix<QRect,Eigen::Dynamic,Eigen::Dynamic> mGridRect;
+    Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic> mGrid;
+    Eigen::Array<Eigen::Array<unsigned char,3,1>,Eigen::Dynamic,Eigen::Dynamic> mColorGrid;
+    Eigen::Array<QRect,Eigen::Dynamic,Eigen::Dynamic> mGridRect;
 
     int mCursorI, mCursorJ;
     bool mIsLeftClick;

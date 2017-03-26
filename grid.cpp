@@ -52,12 +52,12 @@ Grid::~Grid()
     delete ui;
 }
 
-Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> &Grid::getObstacles()
+Eigen::Array<int, Eigen::Dynamic, Eigen::Dynamic> &Grid::getObstacles()
 {
     return mGrid;
 }
 
-Eigen::Matrix<Eigen::Matrix<unsigned char,3,1>, Eigen::Dynamic, Eigen::Dynamic> &Grid::getColor()
+Eigen::Array<Eigen::Array<unsigned char,3,1>, Eigen::Dynamic, Eigen::Dynamic> &Grid::getColor()
 {
     return mColorGrid;
 }
@@ -200,7 +200,7 @@ void Grid::mousePressEvent(QMouseEvent *event)
     {
         if (event->key()==Qt::Key_Enter || event->key()==Qt::Key_Return)
         {   
-            emit compute(31);
+            emit compute(10000);
 
         }else if(event->key()==Qt::Key_0)
         {
