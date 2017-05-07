@@ -4,10 +4,7 @@
 #include <QWidget>
 #include <memory>
 
-#ifndef EIGEN_STACK_ALLOCATION_LIMIT
-// default 131072 == 128 KB, 2097152 = 2MB
-#define EIGEN_STACK_ALLOCATION_LIMIT 2097152
-#endif
+#include "settings.hpp"
 
 #include <eigen3/Eigen/Dense>
 

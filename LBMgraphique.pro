@@ -17,7 +17,9 @@ SOURCES += main.cpp\
 
 HEADERS  += grid.h \
     lbm.hpp \
-    Debug.hpp
+    Debug.hpp \
+    LBMController.hpp \
+    settings.hpp
 
 FORMS    += grid.ui
 

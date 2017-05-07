@@ -2,23 +2,19 @@
 #define LBM_HPP
 
 #include "grid.h"
+#include "settings.hpp"
 
-#ifndef EIGEN_STACK_ALLOCATION_LIMIT
-// default 131072 == 128 KB, 2097152 = 2MB
-#define EIGEN_STACK_ALLOCATION_LIMIT 2097152
-#endif
+#include <QThread>
 
 #include <eigen3/Eigen/Dense>
 #include <array>
 #include <fstream>
 #include <iostream>
 #include <cmath>
-#include <Debug.hpp>
 #include <chrono>
 
-#define DYNAMIC_ALLOCATION
-#define NAVIERSTOKES
-//#define STOKES
+#include <Debug.hpp>
+
 
 
 class catchGridSignal: public QObject
@@ -337,23 +333,21 @@ void LBM<jMax, iMax>::Iterate(int nIter)
         mGn = mGnp;
 
         //~ //--- sorties fichiers
-        if(iter%30 == 0)
+        if(iter%(iterPerCall-1) == 0)
         {
 //            buf.str("");
 //            buf << "u_" << iter <<".vtk";
 //            saveVtk(buf.str());
-            std::cout << "Rescale x" << mRescaler(0) << " -" << mRescaler(1) << std::endl;
-            std::cout << "Total mass: " << mRho.sum() << std::endl;
+//            std::cout << "Rescale x" << mRescaler(0) << " -" << mRescaler(1) << std::endl;
+//            std::cout << "Total mass: " << mRho.sum() << std::endl;
             updateColor();
         }
 
     }// fin boucle en temps
     std::chrono::time_point<std::chrono::system_clock> t2 = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds = t2-t1;
-    std::cout << "Time spent: " << elapsed_seconds.count()  << "sec" << std::endl;
+    //    std::cout << "Time spent: " << elapsed_seconds.count()  << "sec" << std::endl;
+    std::cout << "Speed: " << 1./elapsed_seconds.count()  << "fps" << std::endl;
 }
-
-
-
 
 #endif // LBM_HPP
