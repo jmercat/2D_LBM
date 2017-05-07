@@ -340,6 +340,8 @@ void LBM<jMax, iMax>::Iterate(int nIter)
 //            saveVtk(buf.str());
 //            std::cout << "Rescale x" << mRescaler(0) << " -" << mRescaler(1) << std::endl;
 //            std::cout << "Total mass: " << mRho.sum() << std::endl;
+            if (std::isnan(mRho.sum()))
+                this->Init();
             updateColor();
         }
 

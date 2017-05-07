@@ -1,6 +1,6 @@
 #ifndef DEBUG_HPP
 #define DEBUG_HPP
-//#define DEBUG
+
 #ifdef DEBUG
     #define ONLYDEBUG(p) p
     #define ONLYRELEASE(p)
