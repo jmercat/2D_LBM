@@ -16,7 +16,7 @@ Grid::Grid(int m, int n, QWidget *parent) :
     mWidth = n;
     mHeight = m;
     mGrid.resize(n+2,m+2);
-    mColorGrid.resize(n+2,m+2);
+    mResultGrid.resize(n+2,m+2);
     mGridRect.resize(n,m);
     this->setFixedSize(windowWidth,windowHeight);
     mCursorI = 0;
@@ -24,6 +24,7 @@ Grid::Grid(int m, int n, QWidget *parent) :
     mIsLeftClick = false;
     mIsRightClick = false;
     mIsRunning = false;
+    mShowSpeed = true;
     setGridRect();
     this->setMouseTracking(true);
     ui->setupUi(this);
@@ -35,13 +36,17 @@ Grid::Grid(int m, int n, QWidget *parent) :
 //        }
 //    }
     mGrid.setOnes();
+    mRescaler(0) = 1;
+    mRescaler(1) = 0;
+    mPRescaler(0) = 1;
+    mPRescaler(1) = 0;
     for(int i = 0; i<mWidth+2; i++)
     {
         for (int j= 0; j<mHeight+2; j++)
         {
-            mColorGrid(i,j)(0)=0;
-            mColorGrid(i,j)(1)=0;
-            mColorGrid(i,j)(2)=0;
+            mResultGrid(i,j)(0)=0;
+            mResultGrid(i,j)(1)=0;
+            mResultGrid(i,j)(2)=0;
         }
     }
     this->update();
@@ -57,15 +62,15 @@ Eigen::Array<int, Eigen::Dynamic, Eigen::Dynamic> &Grid::getObstacles()
     return mGrid;
 }
 
-Eigen::Array<Eigen::Array<unsigned char,3,1>, Eigen::Dynamic, Eigen::Dynamic> &Grid::getColor()
+Eigen::Array<Eigen::Array<float,3,1>, Eigen::Dynamic, Eigen::Dynamic> &Grid::getResults()
 {
-    return mColorGrid;
+    return mResultGrid;
 }
 
 void Grid::clearGrid()
 {
     mGrid.setOnes();
-    mColorGrid.setOnes();
+    mResultGrid.setOnes();
     for(int i = 0; i<mWidth; i++)
     {
         for (int j= 0; j<mHeight; j++)
@@ -79,6 +84,12 @@ void Grid::clearGrid()
 void Grid::updateColor()
 {
     this->repaint();
+}
+
+void Grid::setShowSpeed(bool showSpeed)
+{
+    mShowSpeed = showSpeed;
+    this->updateColor();
 }
 
 void Grid::setGridRect()
@@ -99,6 +110,25 @@ void Grid::setGridRect()
     this->update();
 }
 
+void Grid::setColor(QColor* colorToSet, float norm)
+{
+    float currentRescaler;
+    if(mShowSpeed)
+        currentRescaler = mRescaler(0);
+    else
+        currentRescaler = mPRescaler(0);
+    if (norm*currentRescaler<0.5)
+    {
+        colorToSet->setRgb(255*currentRescaler*norm*2,255*currentRescaler*norm*2,255);
+    }else if(norm*currentRescaler<1)
+    {
+        colorToSet->setRgb(255,255*(1-(norm*currentRescaler-0.5)*2),255*(1-(norm*currentRescaler-0.5)*2));
+    }else
+    {
+        colorToSet->setRgb(200,0,0);
+    }
+}
+
 void Grid::drawGrid(QPainter* painter)
 {
     QPen linePen(Qt::gray);
@@ -106,6 +136,16 @@ void Grid::drawGrid(QPainter* painter)
     QBrush brushWhite(Qt::white,Qt::SolidPattern);
     QBrush brushGray(Qt::gray,Qt::SolidPattern);
     QBrush brushBlack(Qt::black,Qt::SolidPattern);
+    QColor* color = new QColor;
+    QColor* colorR = new QColor;
+
+    float normMax = 0;
+    float normMin = 1;
+    float pMax = 0;
+    float pMin = 1000;
+    Eigen::Vector2f speed;
+    float pressure;
+
 
     for(int i = 0; i<mWidth; i++)
     {
@@ -115,9 +155,57 @@ void Grid::drawGrid(QPainter* painter)
 //            painter->drawRect(mGridRect(i,j));
             if (mGrid(i+1,j+1)==1)
             {
-                QColor color(mColorGrid(i,j)(0),mColorGrid(i,j)(1),mColorGrid(i,j)(2));
-                QBrush brushColor(color,Qt::SolidPattern);
+                speed(0) = mResultGrid(i,j)(0);
+                speed(1) = mResultGrid(i,j)(1);
+                pressure = mResultGrid(i,j)(2);
+                float norm = speed.norm();
+                QPointF p1, p2, pv;
+
+                pv.setX(speed(0)/norm);
+                pv.setY(speed(1)/norm);
+
+                normMax = std::max(normMax,norm);
+                normMin = std::min(normMin,norm);
+
+                pMax = std::max(pMax,pressure);
+                pMin = std::min(pMin,pressure);
+
+                norm -= mRescaler(1);
+                pressure -= mPRescaler(1);
+
+                if(mShowSpeed)
+                    this->setColor(color,norm);
+                else
+                    this->setColor(color,pressure);
+
+                QBrush brushColor(*color,Qt::SolidPattern);
                 painter->fillRect(mGridRect(i,j),brushColor);
+
+                if(mShowSpeed)
+                {
+                    if(norm>1.e-5)
+                    {
+                        int r,g,b;
+                        r = std::max(color->red()-50,0);
+                        g = std::max(color->green()-50,0);
+                        b = std::max(color->blue()-50,0);
+                        QColor dirColor(r,g,b);
+                        QPen dirPen(dirColor);
+                        dirPen.setWidth(1);
+                        painter->setPen(dirPen);
+                        pv.setX(mResultGrid(i,j)(0)/norm);
+                        pv.setY(mResultGrid(i,j)(1)/norm);
+
+                        p1 = mGridRect(i,j).height()*pv/2+mGridRect(i,j).center();
+                        p2 = -mGridRect(i,j).height()*pv/2+mGridRect(i,j).center();
+
+                    }else
+                    {
+                        p1 = mGridRect(i,j).center();
+                        p2 = mGridRect(i,j).center();
+                    }
+                    painter->drawLine(p1,p2);
+                }
             }
             else
             {
@@ -125,7 +213,19 @@ void Grid::drawGrid(QPainter* painter)
             }
         }
     }
+    mRescaler(1) = 0.2*normMin+0.8*mRescaler(1);
+    mPRescaler(1) = 0.2*pMin+0.8*mPRescaler(1);
+    if(normMax != normMin)
+    {
+        mRescaler(0) = 0.2/(normMax-normMin)+0.8*mRescaler(0);
+    }
+    if(pMax != pMin)
+    {
+        mPRescaler(0) = 0.2/(pMax-pMin)+0.8*mPRescaler(0);
+    }
     painter->fillRect(mGridRect(mCursorI,mCursorJ),brushGray);
+    delete color;
+    delete colorR;
 }
 
 void Grid::draw(int i, int j, int color)
@@ -200,7 +300,7 @@ void Grid::mousePressEvent(QMouseEvent *event)
     {
         if (event->key()==Qt::Key_Enter || event->key()==Qt::Key_Return)
         {   
-            emit compute(10000);
+            emit compute(iterPerCall);
 
         }else if(event->key()==Qt::Key_0)
         {

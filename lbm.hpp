@@ -32,7 +32,7 @@ template <const unsigned int jMax, const  unsigned int iMax>
 class LBM: public catchGridSignal
 {
 public:
-    LBM(Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& grid,Eigen::Array<Eigen::Array<unsigned char,3,1>,Eigen::Dynamic,Eigen::Dynamic>& color);
+    LBM(Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& grid,Eigen::Array<Eigen::Array<float,3,1>,Eigen::Dynamic,Eigen::Dynamic>& result);
     void compute(unsigned int nIter){Iterate(nIter);}
 
 protected:
@@ -42,11 +42,12 @@ protected:
 
 private:
 
-    Eigen::Array<float,2,1> mRescaler;
+    Eigen::Array<float,2,1> mRescalerU;
+    Eigen::Array<float,2,1> mRescalerR;
     void updateColor();
 
     Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& mObstacle;
-    Eigen::Array<Eigen::Array<unsigned char,3,1>,Eigen::Dynamic,Eigen::Dynamic>& mColorGrid;
+    Eigen::Array<Eigen::Array<float,3,1>,Eigen::Dynamic,Eigen::Dynamic>& mResultGrid;
 
     Eigen::Array<float,iMax,jMax> mRho;
     Eigen::Matrix<Eigen::Matrix<float,2,1>,iMax,jMax> mU;
@@ -102,51 +103,30 @@ private:
 
 
 template <const unsigned int jMax, const  unsigned int iMax>
-LBM<jMax,iMax>::LBM(Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& grid, Eigen::Array<Eigen::Array<unsigned char, 3, 1>, Eigen::Dynamic, Eigen::Dynamic> &color):
+LBM<jMax,iMax>::LBM(Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& grid, Eigen::Array<Eigen::Array<float, 3, 1>, Eigen::Dynamic, Eigen::Dynamic> &result):
     mObstacle(grid),
-    mColorGrid(color)
+    mResultGrid(result)
 {
     assert(grid.cols() == jMax+2 && grid.rows() == iMax+2);
-    mRescaler(0)=1;
-    mRescaler(1)=0;
+    mRescalerU(0)=1;
+    mRescalerU(1)=0;
+    mRescalerR(0)=1;
+    mRescalerR(1)=0;
     this->Init();
 }
 
 template<const unsigned int jMax,const unsigned int iMax>
 void LBM<jMax, iMax>::updateColor()
 {
-    float normMax = 0;
-    float normMin = 1;
     for (unsigned int j = 0; j<jMax; j++)
     {
         for (unsigned int i = 0; i<iMax; i++)
         {
-            float norm = mU(i,j).norm();
-//            float norm = mRho(i,j);
-            normMax = std::max(normMax,norm);
-            normMin = std::min(normMin,norm);
-            norm -= mRescaler(1);
-            if (mRescaler(0)*norm<0.5)
-            {
-                mColorGrid(i,j)(0) = 255*mRescaler(0)*norm*2;
-                mColorGrid(i,j)(1) = 255*norm*mRescaler(0)*2;
-                mColorGrid(i,j)(2) = 255;
-            }else if(mRescaler(0)*norm<1)
-            {
-                mColorGrid(i,j)(0) = 255;
-                mColorGrid(i,j)(1) = 255*(1-(norm*mRescaler(0)-0.5)*2);
-                mColorGrid(i,j)(2) = 255*(1-(norm*mRescaler(0)-0.5)*2);
-            }else
-            {
-                mColorGrid(i,j)(0) = 200;
-                mColorGrid(i,j)(1) = 0;
-                mColorGrid(i,j)(2) = 0;
-            }
-
+            mResultGrid(i,j)(0) = mU(i,j)(0);
+            mResultGrid(i,j)(1) = mU(i,j)(1);
+            mResultGrid(i,j)(2) = mRho(i,j);
         }
     }
-    mRescaler(1) = 0.2*normMin+0.8*mRescaler(1);
-    mRescaler(0) = 0.2/(normMax-normMin)+0.8*mRescaler(0);
     emit colorUpdated();
 }
 
@@ -338,7 +318,7 @@ void LBM<jMax, iMax>::Iterate(int nIter)
 //            buf.str("");
 //            buf << "u_" << iter <<".vtk";
 //            saveVtk(buf.str());
-//            std::cout << "Rescale x" << mRescaler(0) << " -" << mRescaler(1) << std::endl;
+//            std::cout << "Rescale x" << mRescalerU(0) << " -" << mRescalerU(1) << std::endl;
 //            std::cout << "Total mass: " << mRho.sum() << std::endl;
             if (std::isnan(mRho.sum()))
                 this->Init();
