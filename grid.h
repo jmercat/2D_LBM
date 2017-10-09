@@ -23,6 +23,7 @@ public:
     ~Grid();
     Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& getObstacles();
     Eigen::Array<Eigen::Array<float,3,1>,Eigen::Dynamic,Eigen::Dynamic>& getResults();
+        void setBrush(const Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> &brush);
 public slots:
     void clearGrid();
     void updateColor();
@@ -54,11 +55,13 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event);
     void drawGrid(QPainter *painter);
     void keyPressEvent(QKeyEvent *event);
+    void drawPoint(int i, int j, int color);
     void draw(int i, int j, int color);
     void setColor(QColor *colorToSet, float norm);
 
 private:
     Ui::Grid *ui;
+    Eigen::Matrix<bool,Eigen::Dynamic,Eigen::Dynamic> mBrush;
 };
 
 #endif // GRID_H

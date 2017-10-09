@@ -8,6 +8,7 @@
 #include <QKeyEvent>
 #include <QLayout>
 #include <QPushButton>
+#include <QSlider>
 #include <QCoreApplication>
 
 
@@ -51,6 +52,7 @@ class LBMController : public QObject
     QVBoxLayout* VLayout;
     QPushButton* startButton;
     QPushButton* showSpeedButton;
+    QSlider* brushSlider;
 public:
     LBMController()
     {
@@ -64,6 +66,11 @@ public:
         showSpeedButton = new QPushButton(mainWidget);
         showSpeedButton->setCheckable(true);
         this->showSpeedButtonName(true);
+
+        brushSlider = new QSlider(mainWidget);
+        brushSlider->setMinimum(1);
+        brushSlider->setMaximum(10);
+
         LBMWrapper* lbm = new LBMWrapper(w->getObstacles(),w->getResults());
         lbm->moveToThread(&LBMThread);
 
@@ -74,15 +81,18 @@ public:
         HLayout->addWidget(w);
         VLayout->addWidget(startButton);
         VLayout->addWidget(showSpeedButton);
+        VLayout->addWidget(brushSlider);
         HLayout->addLayout(VLayout);
         mainWidget->setLayout(HLayout);
         connect(startButton, &QPushButton::clicked, lbm, &LBMWrapper::start);
         connect(startButton, &QPushButton::clicked, this, &LBMController::startButtonName);
+        connect(brushSlider, &QSlider::valueChanged, this, &LBMController::setBrushSize);
 //        connect(showSpeedButton, &QPushButton::clicked, lbm, &LBMWrapper::start);
         connect(showSpeedButton, &QPushButton::clicked, this, &LBMController::showSpeedButtonName);
         mainWidget->show();
         startButton->click();
         showSpeedButton->click();
+        w->setFocus();
     }
 
     void keyPressEvent(QKeyEvent *event)
@@ -110,6 +120,7 @@ public slots:
             startButton->setText("Pause");
         else
             startButton->setText("Continue");
+        w->setFocus();
     }
     void showSpeedButtonName(bool isOn)
     {
@@ -118,6 +129,25 @@ public slots:
             showSpeedButton->setText("Show pressure");
         else
             showSpeedButton->setText("Show speed");
+        w->setFocus();
+    }
+
+    void setBrushSize(int value)
+    {
+        Eigen::Matrix<bool,Eigen::Dynamic,Eigen::Dynamic> brush;
+        brush.resize(value,value);
+        int midI = value/2;
+
+        int midJ = value/2;
+        for(int i = 0; i<value; i++)
+        {
+            for(int j = 0; j<value; j++)
+            {
+                brush(i,j) = (i-midI)*(i-midI)+(j-midJ)*(j-midJ)<=(value*value)/4;
+            }
+        }
+        w->setBrush(brush);
+        w->setFocus();
     }
 
 signals:

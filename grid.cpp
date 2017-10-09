@@ -1,5 +1,7 @@
 #include "grid.h"
 #include "ui_grid.h"
+
+#include <math.h>
 #include <QGenericMatrix>
 #include <QtWidgets>
 #include <QtGui>
@@ -25,6 +27,8 @@ Grid::Grid(int m, int n, QWidget *parent) :
     mIsRightClick = false;
     mIsRunning = false;
     mShowSpeed = true;
+    mBrush.resize(1,1);
+    mBrush(0,0) = true;
     setGridRect();
     this->setMouseTracking(true);
     ui->setupUi(this);
@@ -129,6 +133,11 @@ void Grid::setColor(QColor* colorToSet, float norm)
     }
 }
 
+void Grid::setBrush(const Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>& brush)
+{
+    mBrush = brush;
+}
+
 void Grid::drawGrid(QPainter* painter)
 {
     QPen linePen(Qt::gray);
@@ -186,9 +195,9 @@ void Grid::drawGrid(QPainter* painter)
                     if(norm>1.e-5)
                     {
                         int r,g,b;
-                        r = std::max(color->red()-50,0);
-                        g = std::max(color->green()-50,0);
-                        b = std::max(color->blue()-50,0);
+                        r = std::max(color->red()-directionContrast,0);
+                        g = std::max(color->green()-directionContrast,0);
+                        b = std::max(color->blue()-directionContrast,0);
                         QColor dirColor(r,g,b);
                         QPen dirPen(dirColor);
                         dirPen.setWidth(1);
@@ -228,9 +237,23 @@ void Grid::drawGrid(QPainter* painter)
     delete colorR;
 }
 
-void Grid::draw(int i, int j, int color)
+void Grid::drawPoint(int i, int j, int color)
 {
     mGrid(i+1,j+1)=color;
+}
+
+void Grid::draw(int i, int j, int color)
+{
+    for (unsigned int jj = std::max(j-(mBrush.rows()+1)/2,long(0)), jjj = 0;
+         jj<std::min(j+mBrush.rows()/2,long(gridSizeX)); jj++, jjj++)
+    {
+        for (unsigned int ii = std::max(i-(mBrush.cols()+1)/2,long(0)),
+             iii = 0; ii<std::min(i+mBrush.cols()/2,long(gridSizeY)); ii++, iii++)
+        {
+            if(mBrush(iii,jjj))
+                this->drawPoint(ii,jj,color);
+        }
+    }
 }
 
 void Grid::paintEvent(QPaintEvent *e)

@@ -122,9 +122,17 @@ void LBM<jMax, iMax>::updateColor()
     {
         for (unsigned int i = 0; i<iMax; i++)
         {
+	    if(i == 0 || j == 0 || mObstacle(i,j) != 0)// || i == iMax-1 || j == jMax-1)
+            {
             mResultGrid(i,j)(0) = mU(i,j)(0);
             mResultGrid(i,j)(1) = mU(i,j)(1);
-            mResultGrid(i,j)(2) = mRho(i,j);
+		    mResultGrid(i,j)(2) = mRho(i,j);
+	    }else if(mObstacle(i,j)!=0)
+	    {
+		mResultGrid(i,j).setZero();
+		mResultGrid(i,j)(2) = mRho.mean();
+	    }
+	    
         }
     }
     emit colorUpdated();
@@ -212,8 +220,17 @@ void LBM<jMax, iMax>::Init()
               mU(i-1,j-1)(0) = (1. - Yc(j-1)* Yc(j-1))*sUin;
           }
 
-          mGn(i,j) = mOmega*mRho(i-1,j-1)*(1+mSpeeds(0)*mU(i-1,j-1)(0)+mSpeeds(1)*mU(i-1,j-1)(1));
+          mGn(i,j)(0) = mOmega(0)*mRho(i-1,j-1);
+          mGn(i,j)(1) = mOmega(1)*mRho(i-1,j-1)*(1+sC*mU(i-1,j-1)(0));
+          mGn(i,j)(2) = mOmega(2)*mRho(i-1,j-1)*(1+sC*mU(i-1,j-1)(1));
+          mGn(i,j)(3) = mOmega(3)*mRho(i-1,j-1)*(1-sC*mU(i-1,j-1)(0));
+          mGn(i,j)(4) = mOmega(4)*mRho(i-1,j-1)*(1-sC*mU(i-1,j-1)(1));
+          mGn(i,j)(5) = mOmega(5)*mRho(i-1,j-1)*(1+sC*(mU(i-1,j-1)(0)+mU(i-1,j-1)(1)));
+          mGn(i,j)(6) = mOmega(6)*mRho(i-1,j-1)*(1-sC*(mU(i-1,j-1)(0)-mU(i-1,j-1)(1)));
+          mGn(i,j)(7) = mOmega(7)*mRho(i-1,j-1)*(1-sC*(mU(i-1,j-1)(0)+mU(i-1,j-1)(1)));
+          mGn(i,j)(8) = mOmega(8)*mRho(i-1,j-1)*(1+sC*(mU(i-1,j-1)(0)-mU(i-1,j-1)(1)));
           mGnp(i,j) = mGn(i,j);
+
       }
   }
 }
@@ -242,12 +259,34 @@ void LBM<jMax, iMax>::Iterate(int nIter)
                     mU(i,j)(0) = 1./mRho(i,j)*sC*(mGn(i+1,j+1)(1)- mGn(i+1,j+1)(3) + mGn(i+1,j+1)(5) - mGn(i+1,j+1)(6) - mGn(i+1,j+1)(7) + mGn(i+1,j+1)(8));
                     mU(i,j)(1) = 1./mRho(i,j)*sC*(mGn(i+1,j+1)(2)- mGn(i+1,j+1)(4) + mGn(i+1,j+1)(5) + mGn(i+1,j+1)(6) - mGn(i+1,j+1)(7) - mGn(i+1,j+1)(8));
                     //- distribution d'equilibre pour Stokes et Navier-Stokes
-                    Eigen::Array<float,9,1> dotProd = mU(i,j)(0)*mSpeeds(0)+mU(i,j)(1)*mSpeeds(1);
+//                    Eigen::Array<float,9,1> dotProd = mU(i,j)(0)*mSpeeds(0)+mU(i,j)(1)*mSpeeds(1);
+
+
+                    Eigen::Array<float,9,1> dotProd;
+
+
+                    float mUijsC0 = mU(i,j)(0)*sC;
+                    float mUijsC1 = mU(i,j)(1)*sC;
+                    float mUijsC0pmUijsC1 = mUijsC0+mUijsC1;
+                    float mUijsC0mmUijsC1 = mUijsC0-mUijsC1;
+                    float mUijSNo2m1 = 0.5*mU(i,j).squaredNorm()-1;
+
+                    dotProd(0) = 0;
+                    dotProd(1) = mUijsC0;
+                    dotProd(2) = mUijsC1;
+                    dotProd(3) = -mUijsC0;
+                    dotProd(4) = -mUijsC1;
+                    dotProd(5) = mUijsC0pmUijsC1;
+                    dotProd(6) = -mUijsC0mmUijsC1;
+                    dotProd(7) = -mUijsC0pmUijsC1;
+                    dotProd(8) = mUijsC0mmUijsC1;
+
+
                     #ifdef STOKES
                         mGeq(i,j) = mOmega*mRho(i,j)*(1+ dotProd);
                     #else
                     #ifdef NAVIERSTOKES
-                        mGeq(i,j) = mOmega*mRho(i,j)*(1+dotProd- 0.5*mU(i,j).squaredNorm() + 0.5*dotProd*dotProd);
+                        mGeq(i,j) = mOmega*mRho(i,j)*(dotProd- mUijSNo2m1 + 0.5*dotProd*dotProd);
                     #endif
                     #endif
 
@@ -256,12 +295,13 @@ void LBM<jMax, iMax>::Iterate(int nIter)
                     mGnp(i+1,j+1)(0) = (1 - sEta)*mGn(i+1,j+1)(0) + sEta*mGeq(i,j)(0);
                     mGnp(i+2,j+1)(1) = (1 - sEta)*mGn(i+1,j+1)(1) + sEta*mGeq(i,j)(1);
                     mGnp(i+1,j+2)(2) = (1 - sEta)*mGn(i+1,j+1)(2) + sEta*mGeq(i,j)(2);
-                    mGnp(i,j+1)(3)   = (1 - sEta)*mGn(i+1,j+1)(3) + sEta*mGeq(i,j)(3);
-                    mGnp(i+1,j)(4)   = (1 - sEta)*mGn(i+1,j+1)(4) + sEta*mGeq(i,j)(4);
+                    mGnp(i,j+1)  (3) = (1 - sEta)*mGn(i+1,j+1)(3) + sEta*mGeq(i,j)(3);
+                    mGnp(i+1,j)  (4) = (1 - sEta)*mGn(i+1,j+1)(4) + sEta*mGeq(i,j)(4);
                     mGnp(i+2,j+2)(5) = (1 - sEta)*mGn(i+1,j+1)(5) + sEta*mGeq(i,j)(5);
-                    mGnp(i,j+2)(6)   = (1 - sEta)*mGn(i+1,j+1)(6) + sEta*mGeq(i,j)(6);
-                    mGnp(i,j)(7)     = (1 - sEta)*mGn(i+1,j+1)(7) + sEta*mGeq(i,j)(7);
-                    mGnp(i+2,j)(8)   = (1 - sEta)*mGn(i+1,j+1)(8) + sEta*mGeq(i,j)(8);
+                    mGnp(i,j+2)  (6) = (1 - sEta)*mGn(i+1,j+1)(6) + sEta*mGeq(i,j)(6);
+                    mGnp(i,j)    (7) = (1 - sEta)*mGn(i+1,j+1)(7) + sEta*mGeq(i,j)(7);
+                    mGnp(i+2,j)  (8) = (1 - sEta)*mGn(i+1,j+1)(8) + sEta*mGeq(i,j)(8);
+
 
                 }else  //obst(i,j) == 0
                 {

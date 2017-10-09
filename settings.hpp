@@ -11,6 +11,8 @@
 #define gridSizeX 100
 #define gridSizeY 200
 
+#define directionContrast 100
+
 #ifndef EIGEN_STACK_ALLOCATION_LIMIT
 // default 131072 == 128 KB, 2097152 = 2MB
 #define EIGEN_STACK_ALLOCATION_LIMIT 2097152
