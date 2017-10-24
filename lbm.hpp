@@ -32,28 +32,31 @@ template <const unsigned int jMax, const  unsigned int iMax>
 class LBM: public catchGridSignal
 {
 public:
-    LBM(Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& grid,Eigen::Array<Eigen::Array<float,3,1>,Eigen::Dynamic,Eigen::Dynamic>& result);
+    LBM(Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& grid,Eigen::Array<Eigen::Array3f,Eigen::Dynamic,Eigen::Dynamic>& result);
     void compute(unsigned int nIter){Iterate(nIter);}
 
 protected:
-    void saveVtk(std::string fileName);
+    void saveVtk(std::string fileName) const;
     void Iterate(int nIter);
     void Init();
 
 private:
 
-    Eigen::Array<float,2,1> mRescalerU;
-    Eigen::Array<float,2,1> mRescalerR;
+    Eigen::Array2f mRescalerU;
+    Eigen::Array2f mRescalerR;
     void updateColor();
 
     Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& mObstacle;
-    Eigen::Array<Eigen::Array<float,3,1>,Eigen::Dynamic,Eigen::Dynamic>& mResultGrid;
+    Eigen::Array<Eigen::Array3f,Eigen::Dynamic,Eigen::Dynamic>& mResultGrid;
 
     Eigen::Array<float,iMax,jMax> mRho;
-    Eigen::Matrix<Eigen::Matrix<float,2,1>,iMax,jMax> mU;
+    Eigen::Matrix<Eigen::Vector2f,iMax,jMax> mU;
 
+    //Viscosity and Boltzman entry speed
     static constexpr float sNu=0.01, sUin=0.4;
+    //Lattice Boltzman D2Q9 uses 9 speeds
     static constexpr int sQMax = 9;
+    //Just because I never know when to stop...
     static constexpr float sC = 1.73205080756887729352744634150587236694280525381038062805580, sEps = 0.2; //sqrt(3)
     static constexpr float sDx = 2./jMax, sDt=sDx*sEps/sC;
     static constexpr float sEta = 1./(sEps*sEps*sNu/sDt+0.5);
@@ -103,7 +106,7 @@ private:
 
 
 template <const unsigned int jMax, const  unsigned int iMax>
-LBM<jMax,iMax>::LBM(Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& grid, Eigen::Array<Eigen::Array<float, 3, 1>, Eigen::Dynamic, Eigen::Dynamic> &result):
+LBM<jMax,iMax>::LBM(Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& grid, Eigen::Array<Eigen::Array3f, Eigen::Dynamic, Eigen::Dynamic> &result):
     mObstacle(grid),
     mResultGrid(result)
 {
@@ -122,16 +125,16 @@ void LBM<jMax, iMax>::updateColor()
     {
         for (unsigned int i = 0; i<iMax; i++)
         {
-	    if(i == 0 || j == 0 || mObstacle(i,j) != 0)// || i == iMax-1 || j == jMax-1)
+            if(i == 0 || j == 0 || mObstacle(i,j) != 0)// || i == iMax-1 || j == jMax-1)
+                {
+                mResultGrid(i,j)(0) = mU(i,j)(0);
+                mResultGrid(i,j)(1) = mU(i,j)(1);
+                mResultGrid(i,j)(2) = mRho(i,j);
+            }else if(mObstacle(i,j)!=0)
             {
-            mResultGrid(i,j)(0) = mU(i,j)(0);
-            mResultGrid(i,j)(1) = mU(i,j)(1);
-		    mResultGrid(i,j)(2) = mRho(i,j);
-	    }else if(mObstacle(i,j)!=0)
-	    {
-		mResultGrid(i,j).setZero();
-		mResultGrid(i,j)(2) = mRho.mean();
-	    }
+                mResultGrid(i,j).setZero();
+                mResultGrid(i,j)(2) = mRho.mean();
+            }
 	    
         }
     }
@@ -139,46 +142,46 @@ void LBM<jMax, iMax>::updateColor()
 }
 
 template<const unsigned int jMax, const unsigned int iMax>
-void LBM<jMax, iMax>::saveVtk(std::string fileName)
+void LBM<jMax, iMax>::saveVtk(std::string fileName) const
 {
     std::ofstream vtkFile;
-    std::cout << "save " << fileName << std::endl;
+    std::cout << "save " << fileName << '\n';
     vtkFile.open(fileName);
-    vtkFile << "# vtk DataFile Version 2.0" << std::endl;
-    vtkFile << "champ de vitesse" << std::endl;
-    vtkFile << "ASCII" << std::endl;
-    vtkFile << "DATASET RECTILINEAR_GRID" << std::endl;
-    vtkFile << "DIMENSIONS    " << iMax+1 << "    "<< jMax+1 << "    " << 1 << std::endl;
-    vtkFile << "X_COORDINATES    " << iMax+1 <<"    double" << std::endl;
+    vtkFile << "# vtk DataFile Version 2.0" << '\n';
+    vtkFile << "champ de vitesse" << '\n';
+    vtkFile << "ASCII" << '\n';
+    vtkFile << "DATASET RECTILINEAR_GRID" << '\n';
+    vtkFile << "DIMENSIONS    " << iMax+1 << "    "<< jMax+1 << "    " << 1 << '\n';
+    vtkFile << "X_COORDINATES    " << iMax+1 <<"    double" << '\n';
     for (unsigned int i = 0; i<iMax+1; i++)
     {
-        vtkFile << X(i) << std::endl;
+        vtkFile << X(i) << '\n';
     }
-    vtkFile << "Y_COORDINATES    " << jMax+1 <<"    double" << std::endl;
+    vtkFile << "Y_COORDINATES    " << jMax+1 <<"    double" << '\n';
     for (unsigned int j = 0; j<jMax+1; j++)
     {
-        vtkFile << Y(j) << std::endl;
+        vtkFile << Y(j) << '\n';
     }
-    vtkFile << "Z_COORDINATES    " << 1 << "    double" << std::endl;
-    vtkFile << 0 << std::endl;
+    vtkFile << "Z_COORDINATES    " << 1 << "    double" << '\n';
+    vtkFile << 0 << '\n';
 
-    vtkFile << "CELL_DATA    " << iMax*jMax << std::endl;
-    vtkFile << "SCALARS rho double" << std::endl;
-    vtkFile << "LOOKUP_TABLE default" << std::endl;
+    vtkFile << "CELL_DATA    " << iMax*jMax << '\n';
+    vtkFile << "SCALARS rho double" << '\n';
+    vtkFile << "LOOKUP_TABLE default" << '\n';
     for (unsigned int j = 0; j<jMax; j++)
     {
         for (unsigned int i = 0; i<iMax; i++)
         {
-            vtkFile << mRho(i,j) << std::endl;
+            vtkFile << mRho(i,j) << '\n';
         }
     }
 
-    vtkFile << "VECTORS u double" << std::endl;
+    vtkFile << "VECTORS u double" << '\n';
     for (unsigned int j = 0; j<jMax; j++)
     {
         for (unsigned int i = 0; i<iMax; i++)
         {
-            vtkFile << mU(i,j)(0) << "    " << mU(i,j)(1) << "    " << 0 << std::endl;
+            vtkFile << mU(i,j)(0) << "    " << mU(i,j)(1) << "    " << 0 << '\n';
         }
     }
 
@@ -242,7 +245,7 @@ void LBM<jMax, iMax>::Iterate(int nIter)
     std::chrono::time_point<std::chrono::system_clock> t1 = std::chrono::system_clock::now();
     std::stringstream buf;
 
-    for (int iter = 1; iter<nIter; iter++)
+    for (int iter = 1; iter<nIter; iter++) // time loop
     {
 //            time += dt;
         //-- collision
@@ -290,8 +293,8 @@ void LBM<jMax, iMax>::Iterate(int nIter)
                     #endif
                     #endif
 
-                    //-- transport des noeuds interieurs (on voit ici pourquoi i et j vont a iMax+2, jMax+2 dans l'allocation de mGnp : c'est pour que le noeuds des bords soient affectés de la meme facon
-
+                    //-- interior nods transport (this is why Gnp is allocated to size (iMax+2, jMax+2)
+                    //-- so border nodes are treated the same way than the others
                     mGnp(i+1,j+1)(0) = (1 - sEta)*mGn(i+1,j+1)(0) + sEta*mGeq(i,j)(0);
                     mGnp(i+2,j+1)(1) = (1 - sEta)*mGn(i+1,j+1)(1) + sEta*mGeq(i,j)(1);
                     mGnp(i+1,j+2)(2) = (1 - sEta)*mGn(i+1,j+1)(2) + sEta*mGeq(i,j)(2);
@@ -320,23 +323,6 @@ void LBM<jMax, iMax>::Iterate(int nIter)
             }
         }
 
-//        //-- CL Sud
-//        for (unsigned int i = 2; i<iMax;i++)
-//        {
-//            //- vitesses rentrantes : BB
-//            mGnp(i,1)(2) = mGnp(i,1)(4);
-//            mGnp(i,1)(6) = mGnp(i,1)(8);
-//            mGnp(i,1)(5) = mGnp(i,1)(7);
-
-//        }
-//        //-- CL Nord
-//        for (unsigned int i = 2; i<iMax;i++)
-//        {
-//            //- vitesses rentrantes : BB
-//            mGnp(i,jMax)(4) = mGnp(i,jMax)(2);
-//            mGnp(i,jMax)(7) = mGnp(i,jMax)(5);
-//            mGnp(i,jMax)(8) = mGnp(i,jMax)(6);
-//        }
         //-- CL Est : Neumann
         for (unsigned int j =1; j<jMax+1; j++)
         {
@@ -350,7 +336,7 @@ void LBM<jMax, iMax>::Iterate(int nIter)
 
         }
 
-        mGn = mGnp;
+        mGn.swap(mGnp);
 
         //~ //--- sorties fichiers
         if(iter%(iterPerCall-1) == 0)
@@ -358,18 +344,19 @@ void LBM<jMax, iMax>::Iterate(int nIter)
 //            buf.str("");
 //            buf << "u_" << iter <<".vtk";
 //            saveVtk(buf.str());
-//            std::cout << "Rescale x" << mRescalerU(0) << " -" << mRescalerU(1) << std::endl;
-//            std::cout << "Total mass: " << mRho.sum() << std::endl;
+//            std::cout << "Rescale x" << mRescalerU(0) << " -" << mRescalerU(1) << '\n';
+//            std::cout << "Total mass: " << mRho.sum() << '\n';
             if (std::isnan(mRho.sum()))
                 this->Init();
             updateColor();
         }
 
-    }// fin boucle en temps
+    }// end of time loop
+
     std::chrono::time_point<std::chrono::system_clock> t2 = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds = t2-t1;
-    //    std::cout << "Time spent: " << elapsed_seconds.count()  << "sec" << std::endl;
-    std::cout << "Speed: " << 1./elapsed_seconds.count()  << "fps" << std::endl;
+    //    std::cout << "Time spent: " << elapsed_seconds.count()  << "sec" << '\n';
+    std::cout << "Speed: " << 1./elapsed_seconds.count()  << "fps" << '\n';
 }
 
 #endif // LBM_HPP
