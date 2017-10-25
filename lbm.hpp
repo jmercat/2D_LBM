@@ -16,7 +16,6 @@
 #include "Debug.hpp"
 
 
-
 class catchGridSignal: public QObject
 {
     Q_OBJECT
@@ -32,6 +31,7 @@ template <const unsigned int jMax, const  unsigned int iMax>
 class LBM: public catchGridSignal
 {
 public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     LBM(Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& grid,Eigen::Array<Eigen::Array3f,Eigen::Dynamic,Eigen::Dynamic>& result);
     void compute(unsigned int nIter){Iterate(nIter);}
 
@@ -104,90 +104,61 @@ private:
     }
 };
 
-
-template <const unsigned int jMax, const  unsigned int iMax>
-LBM<jMax,iMax>::LBM(Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& grid, Eigen::Array<Eigen::Array3f, Eigen::Dynamic, Eigen::Dynamic> &result):
-    mObstacle(grid),
-    mResultGrid(result)
+// unary functors
+template <typename Derived>
+struct sumCoef
 {
-    assert(grid.cols() == jMax+2 && grid.rows() == iMax+2);
-    mRescalerU(0)=1;
-    mRescalerU(1)=0;
-    mRescalerR(0)=1;
-    mRescalerR(1)=0;
-    this->Init();
-}
+  typedef typename Eigen::DenseBase<Derived>::Scalar result_type;
+  result_type operator()(const Eigen::DenseBase<Derived>& m) const { return m.sum(); }
+};
 
-template<const unsigned int jMax,const unsigned int iMax>
-void LBM<jMax, iMax>::updateColor()
+struct computeSpeed
 {
-    for (unsigned int j = 0; j<jMax; j++)
-    {
-        for (unsigned int i = 0; i<iMax; i++)
-        {
-            if(i == 0 || j == 0 || mObstacle(i,j) != 0)// || i == iMax-1 || j == jMax-1)
-                {
-                mResultGrid(i,j)(0) = mU(i,j)(0);
-                mResultGrid(i,j)(1) = mU(i,j)(1);
-                mResultGrid(i,j)(2) = mRho(i,j);
-            }else if(mObstacle(i,j)!=0)
-            {
-                mResultGrid(i,j).setZero();
-                mResultGrid(i,j)(2) = mRho.mean();
-            }
-	    
-        }
-    }
-    emit colorUpdated();
-}
+  typedef Eigen::Vector2f result_type;
+  Eigen::Vector2f operator()(const Eigen::Array<float,9,1>& gn) const
+  {
+      float x = (gn(1)-gn(3)+gn(5)-gn(6)-gn(7)+gn(8));
+      float y = (gn(2)-gn(4)+gn(5)+gn(6)-gn(7)-gn(8));
+      return Eigen::Vector2f(x,y);
+  }
+};
 
-template<const unsigned int jMax, const unsigned int iMax>
-void LBM<jMax, iMax>::saveVtk(std::string fileName) const
+struct computeEquilibriumDistribution
 {
-    std::ofstream vtkFile;
-    std::cout << "save " << fileName << '\n';
-    vtkFile.open(fileName);
-    vtkFile << "# vtk DataFile Version 2.0" << '\n';
-    vtkFile << "champ de vitesse" << '\n';
-    vtkFile << "ASCII" << '\n';
-    vtkFile << "DATASET RECTILINEAR_GRID" << '\n';
-    vtkFile << "DIMENSIONS    " << iMax+1 << "    "<< jMax+1 << "    " << 1 << '\n';
-    vtkFile << "X_COORDINATES    " << iMax+1 <<"    double" << '\n';
-    for (unsigned int i = 0; i<iMax+1; i++)
+    typedef Eigen::Array<float,9,1> result_type;
+    result_type operator()(const Eigen::Vector2f& U) const
     {
-        vtkFile << X(i) << '\n';
-    }
-    vtkFile << "Y_COORDINATES    " << jMax+1 <<"    double" << '\n';
-    for (unsigned int j = 0; j<jMax+1; j++)
-    {
-        vtkFile << Y(j) << '\n';
-    }
-    vtkFile << "Z_COORDINATES    " << 1 << "    double" << '\n';
-    vtkFile << 0 << '\n';
 
-    vtkFile << "CELL_DATA    " << iMax*jMax << '\n';
-    vtkFile << "SCALARS rho double" << '\n';
-    vtkFile << "LOOKUP_TABLE default" << '\n';
-    for (unsigned int j = 0; j<jMax; j++)
-    {
-        for (unsigned int i = 0; i<iMax; i++)
-        {
-            vtkFile << mRho(i,j) << '\n';
-        }
-    }
+        Eigen::Array<float,9,1> dotProd;
 
-    vtkFile << "VECTORS u double" << '\n';
-    for (unsigned int j = 0; j<jMax; j++)
-    {
-        for (unsigned int i = 0; i<iMax; i++)
-        {
-            vtkFile << mU(i,j)(0) << "    " << mU(i,j)(1) << "    " << 0 << '\n';
-        }
-    }
 
-    vtkFile.close();
-    emit endCompute();
-}
+        float C = 1.73205080756887729352744634150587236694280525381038062805580;
+        float UC0 = U(0)*C;
+        float UC1 = U(1)*C;
+        float UC0pUC1 = UC0+UC1;
+        float UC0mUC1 = UC0-UC1;
+        float USNo2m1 = 0.5*U.squaredNorm()-1;
+
+        dotProd(0) = 0;
+        dotProd(1) = UC0;
+        dotProd(2) = UC1;
+        dotProd(3) = -UC0;
+        dotProd(4) = -UC1;
+        dotProd(5) = UC0pUC1;
+        dotProd(6) = -UC0mUC1;
+        dotProd(7) = -UC0pUC1;
+        dotProd(8) = UC0mUC1;
+
+
+        #ifdef STOKES
+            return (Eigen::VectorXf::Ones(9)+ dotProd);
+        #else
+        #ifdef NAVIERSTOKES
+            return (dotProd- USNo2m1 + 0.5*dotProd*dotProd);
+        #endif
+        #endif
+    }
+};
 
 
 template<const unsigned int jMax, const unsigned int iMax>
@@ -247,67 +218,51 @@ void LBM<jMax, iMax>::Iterate(int nIter)
 
     for (int iter = 1; iter<nIter; iter++) // time loop
     {
-//            time += dt;
-        //-- collision
-        mRho.setZero();
-        for (unsigned int i = 0; i<iMax; i++)
-        {
-            for (unsigned int j = 0; j<jMax; j++)
-            {
+        const auto& centerGn = mGn.block<iMax,jMax>(1,1);
 
-                mRho(i,j) += mGn(i+1,j+1).sum();
+        //integrate density to get pressure:
+        mRho = centerGn.unaryExpr(sumCoef<Eigen::Array<float,sQMax,1> >());
+
+        //Compute macroscopic speeds
+        mU = centerGn.unaryExpr(computeSpeed());
+        // normalize
+        for (size_t i = 0, sizeRho = mRho.size(); i<sizeRho; i++)
+        {mU(i) *= sC/mRho(i);}
+
+        //Compute equilibrium distribution
+        mGeq = mU.unaryExpr(computeEquilibriumDistribution());
+        // normalize
+        for (size_t i = 0, sizeRho = mRho.size(); i<sizeRho; i++)
+        {mGeq(i) *= mOmega*mRho(i);}
+
+
+
+        //-- collision
+        for (unsigned int j = 0; j<jMax; j++)
+        {
+            for (unsigned int i = 0; i<iMax; i++)
+            {
 
                 if (mObstacle(i,j) == 1)
                 {
-                    mU(i,j)(0) = 1./mRho(i,j)*sC*(mGn(i+1,j+1)(1)- mGn(i+1,j+1)(3) + mGn(i+1,j+1)(5) - mGn(i+1,j+1)(6) - mGn(i+1,j+1)(7) + mGn(i+1,j+1)(8));
-                    mU(i,j)(1) = 1./mRho(i,j)*sC*(mGn(i+1,j+1)(2)- mGn(i+1,j+1)(4) + mGn(i+1,j+1)(5) + mGn(i+1,j+1)(6) - mGn(i+1,j+1)(7) - mGn(i+1,j+1)(8));
-                    //- distribution d'equilibre pour Stokes et Navier-Stokes
-//                    Eigen::Array<float,9,1> dotProd = mU(i,j)(0)*mSpeeds(0)+mU(i,j)(1)*mSpeeds(1);
-
-
-                    Eigen::Array<float,9,1> dotProd;
-
-
-                    float mUijsC0 = mU(i,j)(0)*sC;
-                    float mUijsC1 = mU(i,j)(1)*sC;
-                    float mUijsC0pmUijsC1 = mUijsC0+mUijsC1;
-                    float mUijsC0mmUijsC1 = mUijsC0-mUijsC1;
-                    float mUijSNo2m1 = 0.5*mU(i,j).squaredNorm()-1;
-
-                    dotProd(0) = 0;
-                    dotProd(1) = mUijsC0;
-                    dotProd(2) = mUijsC1;
-                    dotProd(3) = -mUijsC0;
-                    dotProd(4) = -mUijsC1;
-                    dotProd(5) = mUijsC0pmUijsC1;
-                    dotProd(6) = -mUijsC0mmUijsC1;
-                    dotProd(7) = -mUijsC0pmUijsC1;
-                    dotProd(8) = mUijsC0mmUijsC1;
-
-
-                    #ifdef STOKES
-                        mGeq(i,j) = mOmega*mRho(i,j)*(1+ dotProd);
-                    #else
-                    #ifdef NAVIERSTOKES
-                        mGeq(i,j) = mOmega*mRho(i,j)*(dotProd- mUijSNo2m1 + 0.5*dotProd*dotProd);
-                    #endif
-                    #endif
-
-                    //-- interior nods transport (this is why Gnp is allocated to size (iMax+2, jMax+2)
+                    Eigen::Matrix<float,sQMax,1> temp;
+                    temp = (1 - sEta)*mGn(i+1,j+1) + sEta*mGeq(i,j);
+                    //-- interior nodes transport (this is why Gnp is allocated to size (iMax+2, jMax+2)
                     //-- so border nodes are treated the same way than the others
-                    mGnp(i+1,j+1)(0) = (1 - sEta)*mGn(i+1,j+1)(0) + sEta*mGeq(i,j)(0);
-                    mGnp(i+2,j+1)(1) = (1 - sEta)*mGn(i+1,j+1)(1) + sEta*mGeq(i,j)(1);
-                    mGnp(i+1,j+2)(2) = (1 - sEta)*mGn(i+1,j+1)(2) + sEta*mGeq(i,j)(2);
-                    mGnp(i,j+1)  (3) = (1 - sEta)*mGn(i+1,j+1)(3) + sEta*mGeq(i,j)(3);
-                    mGnp(i+1,j)  (4) = (1 - sEta)*mGn(i+1,j+1)(4) + sEta*mGeq(i,j)(4);
-                    mGnp(i+2,j+2)(5) = (1 - sEta)*mGn(i+1,j+1)(5) + sEta*mGeq(i,j)(5);
-                    mGnp(i,j+2)  (6) = (1 - sEta)*mGn(i+1,j+1)(6) + sEta*mGeq(i,j)(6);
-                    mGnp(i,j)    (7) = (1 - sEta)*mGn(i+1,j+1)(7) + sEta*mGeq(i,j)(7);
-                    mGnp(i+2,j)  (8) = (1 - sEta)*mGn(i+1,j+1)(8) + sEta*mGeq(i,j)(8);
+                    mGnp(i+1,j+1)(0) = temp(0);
+                    mGnp(i+2,j+1)(1) = temp(1);
+                    mGnp(i+1,j+2)(2) = temp(2);
+                    mGnp(i,j+1)  (3) = temp(3);
+                    mGnp(i+1,j)  (4) = temp(4);
+                    mGnp(i+2,j+2)(5) = temp(5);
+                    mGnp(i,j+2)  (6) = temp(6);
+                    mGnp(i,j)    (7) = temp(7);
+                    mGnp(i+2,j)  (8) = temp(8);
 
 
                 }else  //obst(i,j) == 0
                 {
+
                     mGnp(i+1,j+1)(0) = mGn(i+1,j+1)(0);
                     mGnp(i+2,j+1)(1) = mGn(i+1,j+1)(3);
                     mGnp(i+1,j+2)(2) = mGn(i+1,j+1)(4);
@@ -324,16 +279,12 @@ void LBM<jMax, iMax>::Iterate(int nIter)
         }
 
         //-- CL Est : Neumann
-        for (unsigned int j =1; j<jMax+1; j++)
-        {
-            mGnp(iMax,j) = mGnp(iMax-1,j);
-        }
+        mGnp.row(iMax) = mGnp.row(iMax-1);
+
         //-- CL Ouest : Dirichlet
         for (unsigned int j =0; j<jMax; j++)
         {
-
             mGnp(1,j+1) = mOmega*mRho(0,j)*(1+(1-Yc(j)*Yc(j))*sUin*mSpeeds(0));
-
         }
 
         mGn.swap(mGnp);
@@ -354,9 +305,94 @@ void LBM<jMax, iMax>::Iterate(int nIter)
     }// end of time loop
 
     std::chrono::time_point<std::chrono::system_clock> t2 = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsed_seconds = t2-t1;
+    std::chrono::duration<float> elapsed_seconds = t2-t1;
     //    std::cout << "Time spent: " << elapsed_seconds.count()  << "sec" << '\n';
     std::cout << "Speed: " << 1./elapsed_seconds.count()  << "fps" << '\n';
+}
+
+
+template <const unsigned int jMax, const  unsigned int iMax>
+LBM<jMax,iMax>::LBM(Eigen::Array<int,Eigen::Dynamic,Eigen::Dynamic>& grid, Eigen::Array<Eigen::Array3f, Eigen::Dynamic, Eigen::Dynamic> &result):
+    mObstacle(grid),
+    mResultGrid(result)
+{
+    assert(grid.cols() == jMax+2 && grid.rows() == iMax+2);
+    mRescalerU(0)=1;
+    mRescalerU(1)=0;
+    mRescalerR(0)=1;
+    mRescalerR(1)=0;
+    this->Init();
+}
+
+template<const unsigned int jMax,const unsigned int iMax>
+void LBM<jMax, iMax>::updateColor()
+{
+    for (unsigned int j = 0; j<jMax; j++)
+    {
+        for (unsigned int i = 0; i<iMax; i++)
+        {
+            if(i == 0 || j == 0 || mObstacle(i,j) != 0)// || i == iMax-1 || j == jMax-1)
+                {
+                mResultGrid(i,j)(0) = mU(i,j)(0);
+                mResultGrid(i,j)(1) = mU(i,j)(1);
+                mResultGrid(i,j)(2) = mRho(i,j);
+            }else if(mObstacle(i,j)!=0)
+            {
+                mResultGrid(i,j).setZero();
+                mResultGrid(i,j)(2) = mRho.mean();
+            }
+
+        }
+    }
+    emit colorUpdated();
+}
+
+template<const unsigned int jMax, const unsigned int iMax>
+void LBM<jMax, iMax>::saveVtk(std::string fileName) const
+{
+    std::ofstream vtkFile;
+    std::cout << "save " << fileName << '\n';
+    vtkFile.open(fileName);
+    vtkFile << "# vtk DataFile Version 2.0" << '\n';
+    vtkFile << "champ de vitesse" << '\n';
+    vtkFile << "ASCII" << '\n';
+    vtkFile << "DATASET RECTILINEAR_GRID" << '\n';
+    vtkFile << "DIMENSIONS    " << iMax+1 << "    "<< jMax+1 << "    " << 1 << '\n';
+    vtkFile << "X_COORDINATES    " << iMax+1 <<"    double" << '\n';
+    for (unsigned int i = 0; i<iMax+1; i++)
+    {
+        vtkFile << X(i) << '\n';
+    }
+    vtkFile << "Y_COORDINATES    " << jMax+1 <<"    double" << '\n';
+    for (unsigned int j = 0; j<jMax+1; j++)
+    {
+        vtkFile << Y(j) << '\n';
+    }
+    vtkFile << "Z_COORDINATES    " << 1 << "    double" << '\n';
+    vtkFile << 0 << '\n';
+
+    vtkFile << "CELL_DATA    " << iMax*jMax << '\n';
+    vtkFile << "SCALARS rho double" << '\n';
+    vtkFile << "LOOKUP_TABLE default" << '\n';
+    for (unsigned int j = 0; j<jMax; j++)
+    {
+        for (unsigned int i = 0; i<iMax; i++)
+        {
+            vtkFile << mRho(i,j) << '\n';
+        }
+    }
+
+    vtkFile << "VECTORS u double" << '\n';
+    for (unsigned int j = 0; j<jMax; j++)
+    {
+        for (unsigned int i = 0; i<iMax; i++)
+        {
+            vtkFile << mU(i,j)(0) << "    " << mU(i,j)(1) << "    " << 0 << '\n';
+        }
+    }
+
+    vtkFile.close();
+    emit endCompute();
 }
 
 #endif // LBM_HPP
