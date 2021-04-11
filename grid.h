@@ -1,4 +1,4 @@
-﻿#ifndef GRID_H
+#ifndef GRID_H
 #define GRID_H
 
 #include <QWidget>
@@ -6,7 +6,7 @@
 
 #include "settings.hpp"
 
-#include <eigen3/Eigen/Dense>
+#include <Eigen/Dense>
 
 
 namespace Ui

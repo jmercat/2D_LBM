@@ -6,7 +6,7 @@
 
 #include <QThread>
 
-#include <eigen3/Eigen/Dense>
+#include <Eigen/Dense>
 #include <array>
 #include <fstream>
 #include <iostream>
@@ -209,6 +209,8 @@ void LBM<jMax, iMax>::Init()
   }
 }
 
+
+
 template<const unsigned int jMax, const unsigned int iMax>
 void LBM<jMax, iMax>::Iterate(int nIter)
 {
@@ -218,8 +220,10 @@ void LBM<jMax, iMax>::Iterate(int nIter)
 
     for (int iter = 1; iter<nIter; iter++) // time loop
     {
-        const auto& centerGn = mGn.block<iMax,jMax>(1,1);
+        //const auto& centerGn = mGn.block<iMax,jMax>(1,1);
+        const auto& centerGn = mGn.block(1, 1, iMax, jMax);
 
+        
         //integrate density to get pressure:
         mRho = centerGn.unaryExpr(sumCoef<Eigen::Array<float,sQMax,1> >());
 

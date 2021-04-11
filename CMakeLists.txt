@@ -1,5 +1,9 @@
 project(LBMgraphique)
 
+cmake_minimum_required(VERSION 2.8.12)
+
+set(CMAKE_PREFIX_PATH /opt/homebrew/opt/qt5/lib/cmake/)
+
 find_package(Qt5Widgets REQUIRED)
 find_package(Eigen3 REQUIRED)
 
